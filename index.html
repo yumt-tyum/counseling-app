@@ -54,34 +54,81 @@
     margin:0;
   }
 
-  .date-strip{
-    display:flex;
-    gap:10px;
-    overflow-x:auto;
-    padding:6px 2px 14px;
-    margin-bottom:8px;
-    scrollbar-width:none;
-  }
-  .date-strip::-webkit-scrollbar{ display:none; }
-  .date-chip{
-    flex:0 0 auto;
-    padding:10px 16px;
-    border-radius:16px;
+  .calendar{
     background:var(--card);
-    color:var(--text-main);
-    font-size:14px;
+    border-radius:20px;
+    padding:18px 16px;
+    box-shadow: 6px 6px 14px var(--shadow-dark), -6px -6px 14px var(--shadow-light);
+  }
+  .cal-header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:14px;
+  }
+  .cal-header .month-label{
+    font-family:'Jua', sans-serif;
+    font-size:16px;
+  }
+  .cal-nav{
+    width:34px; height:34px;
+    border-radius:50%;
     border:none;
-    box-shadow: 5px 5px 10px var(--shadow-dark), -5px -5px 10px var(--shadow-light);
+    background:var(--bg);
+    color:var(--text-main);
+    font-size:16px;
+    cursor:pointer;
+    box-shadow: 3px 3px 6px var(--shadow-dark), -3px -3px 6px var(--shadow-light);
+  }
+  .cal-nav:active{
+    box-shadow: inset 2px 2px 4px var(--shadow-dark), inset -2px -2px 4px var(--shadow-light);
+  }
+  .cal-weekdays, .cal-grid{
+    display:grid;
+    grid-template-columns: repeat(7, 1fr);
+  }
+  .cal-weekdays div{
+    text-align:center;
+    font-size:12px;
+    color:var(--text-muted);
+    padding-bottom:8px;
+  }
+  .cal-grid div.cell{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    aspect-ratio:1/1;
+    margin:3px 0;
+  }
+  .day-btn{
+    width:34px; height:34px;
+    border-radius:12px;
+    border:none;
+    background:transparent;
+    font-family:'Gowun Dodum', sans-serif;
+    font-size:13px;
+    color:var(--text-main);
     cursor:pointer;
     transition: all .15s ease;
   }
-  .date-chip:active{
-    box-shadow: inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light);
+  .day-btn.selectable:hover{
+    background:var(--bg);
   }
-  .date-chip.selected{
+  .day-btn.selectable:active{
+    box-shadow: inset 2px 2px 4px var(--shadow-dark), inset -2px -2px 4px var(--shadow-light);
+  }
+  .day-btn.today{
+    border:1.5px solid var(--accent-soft);
+  }
+  .day-btn.selected{
     background:var(--accent);
     color:#fff;
-    box-shadow: inset 3px 3px 6px rgba(0,0,0,0.15), inset -3px -3px 6px rgba(255,255,255,0.2);
+    box-shadow: 3px 3px 7px var(--shadow-dark);
+  }
+  .day-btn.disabled{
+    color:var(--text-muted);
+    opacity:0.4;
+    cursor:not-allowed;
   }
 
   .section-label{
@@ -230,8 +277,19 @@
     <p class="sub">평일 08:00 ~ 16:00 사이, 비어있는 시간을 골라 신청하세요.</p>
   </header>
 
-  <div id="dateStrip" class="date-strip"></div>
-  <div class="section-label" id="timeLabel">시간 선택</div>
+  <div class="calendar">
+    <div class="cal-header">
+      <button class="cal-nav" id="prevMonth">‹</button>
+      <div class="month-label" id="monthLabel"></div>
+      <button class="cal-nav" id="nextMonth">›</button>
+    </div>
+    <div class="cal-weekdays">
+      <div>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div>
+    </div>
+    <div class="cal-grid" id="calGrid"></div>
+  </div>
+
+  <div class="section-label" id="timeLabel">날짜를 먼저 선택하세요</div>
   <div id="timeGrid" class="time-grid"></div>
 </div>
 
@@ -262,59 +320,108 @@
   // ⚠️ Apps Script 배포 후 발급된 웹앱 URL을 여기에 붙여넣으세요.
   const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzaSJApCT9-I9Xkm3wOei_tGSxuBYbuczVxK-B0IdiE8mHvX_zS1EggbL5lJ0TBgRqRfQ/exec';
 
-  let scheduleData = [];
+  let viewYear, viewMonth;
   let selectedDate = null;
   let selectedTime = null;
+  let currentSlots = [];
 
-  const dateStripEl = document.getElementById('dateStrip');
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  viewYear = today.getFullYear();
+  viewMonth = today.getMonth();
+
+  const monthLabelEl = document.getElementById('monthLabel');
+  const calGridEl = document.getElementById('calGrid');
   const timeGridEl = document.getElementById('timeGrid');
   const timeLabelEl = document.getElementById('timeLabel');
   const overlayEl = document.getElementById('overlay');
   const pickedInfoEl = document.getElementById('pickedInfo');
   const toastEl = document.getElementById('toast');
 
-  async function loadSlots(){
-    timeGridEl.innerHTML = '<div class="empty-msg">불러오는 중...</div>';
-    try{
-      const res = await fetch(APPS_SCRIPT_URL + '?action=getSlots');
-      scheduleData = await res.json();
-      renderDateStrip();
-      if(scheduleData.length){
-        selectDate(scheduleData[0].date);
+  function pad(n){ return n < 10 ? '0' + n : '' + n; }
+  function toDateStr(y, m, d){ return y + '-' + pad(m+1) + '-' + pad(d); }
+
+  function renderCalendar(){
+    monthLabelEl.textContent = viewYear + '년 ' + (viewMonth + 1) + '월';
+    calGridEl.innerHTML = '';
+
+    const firstDow = new Date(viewYear, viewMonth, 1).getDay();
+    const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+
+    for(let i = 0; i < firstDow; i++){
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      calGridEl.appendChild(cell);
+    }
+
+    for(let d = 1; d <= daysInMonth; d++){
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+
+      const dateObj = new Date(viewYear, viewMonth, d);
+      const dow = dateObj.getDay();
+      const dateStr = toDateStr(viewYear, viewMonth, d);
+      const isPast = dateObj < today;
+      const isWeekend = dow === 0 || dow === 6;
+      const isToday = dateObj.getTime() === today.getTime();
+      const isSelected = dateStr === selectedDate;
+      const disabled = isPast || isWeekend;
+
+      const btn = document.createElement('button');
+      btn.textContent = d;
+      btn.className = 'day-btn' +
+        (disabled ? ' disabled' : ' selectable') +
+        (isToday ? ' today' : '') +
+        (isSelected ? ' selected' : '');
+
+      if(!disabled){
+        btn.onclick = () => selectDate(dateStr);
+      }else{
+        btn.disabled = true;
       }
-    }catch(err){
-      timeGridEl.innerHTML = '<div class="empty-msg">일정을 불러오지 못했어요. 잠시 후 다시 시도해주세요.</div>';
+
+      cell.appendChild(btn);
+      calGridEl.appendChild(cell);
     }
   }
 
-  function renderDateStrip(){
-    dateStripEl.innerHTML = '';
-    scheduleData.forEach(day => {
-      const btn = document.createElement('button');
-      btn.className = 'date-chip' + (day.date === selectedDate ? ' selected' : '');
-      btn.textContent = day.label;
-      btn.onclick = () => selectDate(day.date);
-      dateStripEl.appendChild(btn);
-    });
-  }
+  document.getElementById('prevMonth').onclick = () => {
+    viewMonth--;
+    if(viewMonth < 0){ viewMonth = 11; viewYear--; }
+    renderCalendar();
+  };
+  document.getElementById('nextMonth').onclick = () => {
+    viewMonth++;
+    if(viewMonth > 11){ viewMonth = 0; viewYear++; }
+    renderCalendar();
+  };
 
-  function selectDate(date){
-    selectedDate = date;
-    renderDateStrip();
-    renderTimeGrid();
+  async function selectDate(dateStr){
+    selectedDate = dateStr;
+    renderCalendar();
+
+    const d = new Date(dateStr + 'T00:00:00');
+    const dowNames = ['일','월','화','수','목','금','토'];
+    timeLabelEl.textContent = (d.getMonth()+1) + '/' + d.getDate() + '(' + dowNames[d.getDay()] + ') 시간 선택';
+    timeGridEl.innerHTML = '<div class="empty-msg">불러오는 중...</div>';
+
+    try{
+      const res = await fetch(APPS_SCRIPT_URL + '?action=getSlots&date=' + dateStr);
+      const data = await res.json();
+      currentSlots = data.slots || [];
+      renderTimeGrid();
+    }catch(err){
+      timeGridEl.innerHTML = '<div class="empty-msg">시간을 불러오지 못했어요. 잠시 후 다시 시도해주세요.</div>';
+    }
   }
 
   function renderTimeGrid(){
-    const day = scheduleData.find(d => d.date === selectedDate);
-    timeLabelEl.textContent = day ? day.label + ' 시간 선택' : '시간 선택';
     timeGridEl.innerHTML = '';
-
-    if(!day || !day.slots.length){
+    if(!currentSlots.length){
       timeGridEl.innerHTML = '<div class="empty-msg">신청 가능한 시간이 없어요.</div>';
       return;
     }
-
-    day.slots.forEach(slot => {
+    currentSlots.forEach(slot => {
       const btn = document.createElement('button');
       btn.className = 'time-chip' + (slot.available ? '' : ' disabled');
       btn.textContent = slot.time;
@@ -329,8 +436,8 @@
 
   function openSheet(time){
     selectedTime = time;
-    const day = scheduleData.find(d => d.date === selectedDate);
-    pickedInfoEl.textContent = day.label + ' ' + time;
+    const d = new Date(selectedDate + 'T00:00:00');
+    pickedInfoEl.textContent = (d.getMonth()+1) + '/' + d.getDate() + ' ' + time;
     document.getElementById('studentId').value = '';
     document.getElementById('studentName').value = '';
     document.getElementById('purpose').value = '';
@@ -357,7 +464,7 @@
     try{
       const res = await fetch(APPS_SCRIPT_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // 단순 요청으로 보내 CORS 사전요청을 피함
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({ studentId, name, date: selectedDate, time: selectedTime, purpose })
       });
       const result = await res.json();
@@ -365,7 +472,7 @@
       if(result.success){
         overlayEl.classList.remove('open');
         showToast('신청이 완료되었어요!');
-        loadSlots();
+        selectDate(selectedDate);
       }else{
         showToast(result.message || '신청에 실패했어요. 다시 시도해주세요.');
       }
@@ -383,7 +490,7 @@
     setTimeout(() => toastEl.classList.remove('show'), 2200);
   }
 
-  loadSlots();
+  renderCalendar();
 </script>
 </body>
 </html>

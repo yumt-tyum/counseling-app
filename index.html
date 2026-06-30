@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>상담 신청</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F4F2FB;
+    --card:#FBFAFE;
+    --accent:#9B8AC4;
+    --accent-soft:#C9BCE8;
+    --mint:#7FC8A9;
+    --text-main:#4A4458;
+    --text-muted:#A39CB8;
+    --disabled-bg:#EAE7F2;
+    --shadow-dark: rgba(155,141,178,0.35);
+    --shadow-light: rgba(255,255,255,0.95);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    font-family:'Gowun Dodum', sans-serif;
+    color:var(--text-main);
+    display:flex;
+    justify-content:center;
+  }
+  .app{
+    width:100%;
+    max-width:480px;
+    min-height:100vh;
+    padding:28px 20px 40px;
+    position:relative;
+  }
+  header{ margin-bottom:24px; }
+  .eyebrow{
+    font-family:'Jua', sans-serif;
+    font-size:13px;
+    color:var(--accent);
+    letter-spacing:0.5px;
+  }
+  h1{
+    font-family:'Jua', sans-serif;
+    font-size:26px;
+    margin:6px 0 4px;
+    font-weight:400;
+  }
+  .sub{
+    font-size:14px;
+    color:var(--text-muted);
+    margin:0;
+  }
+
+  .date-strip{
+    display:flex;
+    gap:10px;
+    overflow-x:auto;
+    padding:6px 2px 14px;
+    margin-bottom:8px;
+    scrollbar-width:none;
+  }
+  .date-strip::-webkit-scrollbar{ display:none; }
+  .date-chip{
+    flex:0 0 auto;
+    padding:10px 16px;
+    border-radius:16px;
+    background:var(--card);
+    color:var(--text-main);
+    font-size:14px;
+    border:none;
+    box-shadow: 5px 5px 10px var(--shadow-dark), -5px -5px 10px var(--shadow-light);
+    cursor:pointer;
+    transition: all .15s ease;
+  }
+  .date-chip:active{
+    box-shadow: inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light);
+  }
+  .date-chip.selected{
+    background:var(--accent);
+    color:#fff;
+    box-shadow: inset 3px 3px 6px rgba(0,0,0,0.15), inset -3px -3px 6px rgba(255,255,255,0.2);
+  }
+
+  .section-label{
+    font-size:13px;
+    color:var(--text-muted);
+    margin:18px 2px 10px;
+  }
+
+  .time-grid{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+  .time-chip{
+    flex:0 0 calc(25% - 8px);
+    padding:12px 0;
+    text-align:center;
+    border-radius:14px;
+    font-size:14px;
+    border:none;
+    background:var(--card);
+    color:var(--text-main);
+    box-shadow: 4px 4px 8px var(--shadow-dark), -4px -4px 8px var(--shadow-light);
+    cursor:pointer;
+    transition: all .15s ease;
+  }
+  .time-chip:active{
+    box-shadow: inset 2px 2px 5px var(--shadow-dark), inset -2px -2px 5px var(--shadow-light);
+  }
+  .time-chip.disabled{
+    background:var(--disabled-bg);
+    color:var(--text-muted);
+    box-shadow:none;
+    cursor:not-allowed;
+    opacity:0.7;
+  }
+
+  .empty-msg{
+    font-size:14px;
+    color:var(--text-muted);
+    padding:30px 4px;
+    text-align:center;
+  }
+
+  .overlay{
+    position:fixed; inset:0;
+    background:rgba(74,68,88,0.35);
+    display:none;
+    align-items:flex-end;
+    justify-content:center;
+    z-index:10;
+  }
+  .overlay.open{ display:flex; }
+  .sheet{
+    width:100%;
+    max-width:480px;
+    background:var(--card);
+    border-radius:24px 24px 0 0;
+    padding:24px 22px 28px;
+    box-shadow: 0 -8px 20px rgba(74,68,88,0.2);
+    animation: slideUp .25s ease;
+  }
+  @keyframes slideUp{
+    from{ transform:translateY(100%); }
+    to{ transform:translateY(0); }
+  }
+  .sheet h2{
+    font-family:'Jua', sans-serif;
+    font-size:19px;
+    font-weight:400;
+    margin:0 0 4px;
+  }
+  .sheet .picked{
+    font-size:13px;
+    color:var(--accent);
+    margin-bottom:18px;
+  }
+  label{
+    display:block;
+    font-size:13px;
+    color:var(--text-muted);
+    margin:14px 0 6px;
+  }
+  input, textarea{
+    width:100%;
+    padding:12px 14px;
+    border:none;
+    border-radius:14px;
+    background:var(--bg);
+    font-family:'Gowun Dodum', sans-serif;
+    font-size:14px;
+    color:var(--text-main);
+    box-shadow: inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light);
+  }
+  textarea{ min-height:70px; resize:vertical; }
+  input:focus, textarea:focus{ outline:2px solid var(--accent-soft); }
+
+  .btn-row{
+    display:flex;
+    gap:10px;
+    margin-top:22px;
+  }
+  button.primary, button.ghost{
+    flex:1;
+    padding:14px 0;
+    border-radius:16px;
+    border:none;
+    font-family:'Gowun Dodum', sans-serif;
+    font-size:15px;
+    cursor:pointer;
+  }
+  button.ghost{
+    background:var(--bg);
+    color:var(--text-muted);
+  }
+  button.primary{
+    background:var(--accent);
+    color:#fff;
+    box-shadow: 4px 4px 10px var(--shadow-dark);
+    transition: transform .1s ease;
+  }
+  button.primary:active{ transform:scale(0.97); }
+  button.primary:disabled{ opacity:0.6; cursor:not-allowed; }
+
+  .toast{
+    position:fixed;
+    bottom:24px; left:50%;
+    transform:translateX(-50%) translateY(20px);
+    background:var(--mint);
+    color:#fff;
+    padding:12px 22px;
+    border-radius:16px;
+    font-size:14px;
+    opacity:0;
+    transition: all .25s ease;
+    z-index:20;
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="eyebrow">상담 신청</div>
+    <h1>선생님과 상담 시간 잡기</h1>
+    <p class="sub">평일 08:00 ~ 16:00 사이, 비어있는 시간을 골라 신청하세요.</p>
+  </header>
+
+  <div id="dateStrip" class="date-strip"></div>
+  <div class="section-label" id="timeLabel">시간 선택</div>
+  <div id="timeGrid" class="time-grid"></div>
+</div>
+
+<div id="overlay" class="overlay">
+  <div class="sheet">
+    <h2>상담 신청</h2>
+    <div class="picked" id="pickedInfo"></div>
+
+    <label for="studentId">학번</label>
+    <input id="studentId" type="text" inputmode="numeric" placeholder="예: 20413">
+
+    <label for="studentName">이름</label>
+    <input id="studentName" type="text" placeholder="예: 김민지">
+
+    <label for="purpose">상담 목적</label>
+    <textarea id="purpose" placeholder="어떤 이야기를 나누고 싶은지 간단히 적어주세요"></textarea>
+
+    <div class="btn-row">
+      <button class="ghost" id="cancelBtn">취소</button>
+      <button class="primary" id="submitBtn">신청하기</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // ⚠️ Apps Script 배포 후 발급된 웹앱 URL을 여기에 붙여넣으세요.
+  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzaSJApCT9-I9Xkm3wOei_tGSxuBYbuczVxK-B0IdiE8mHvX_zS1EggbL5lJ0TBgRqRfQ/exec';
+
+  let scheduleData = [];
+  let selectedDate = null;
+  let selectedTime = null;
+
+  const dateStripEl = document.getElementById('dateStrip');
+  const timeGridEl = document.getElementById('timeGrid');
+  const timeLabelEl = document.getElementById('timeLabel');
+  const overlayEl = document.getElementById('overlay');
+  const pickedInfoEl = document.getElementById('pickedInfo');
+  const toastEl = document.getElementById('toast');
+
+  async function loadSlots(){
+    timeGridEl.innerHTML = '<div class="empty-msg">불러오는 중...</div>';
+    try{
+      const res = await fetch(APPS_SCRIPT_URL + '?action=getSlots');
+      scheduleData = await res.json();
+      renderDateStrip();
+      if(scheduleData.length){
+        selectDate(scheduleData[0].date);
+      }
+    }catch(err){
+      timeGridEl.innerHTML = '<div class="empty-msg">일정을 불러오지 못했어요. 잠시 후 다시 시도해주세요.</div>';
+    }
+  }
+
+  function renderDateStrip(){
+    dateStripEl.innerHTML = '';
+    scheduleData.forEach(day => {
+      const btn = document.createElement('button');
+      btn.className = 'date-chip' + (day.date === selectedDate ? ' selected' : '');
+      btn.textContent = day.label;
+      btn.onclick = () => selectDate(day.date);
+      dateStripEl.appendChild(btn);
+    });
+  }
+
+  function selectDate(date){
+    selectedDate = date;
+    renderDateStrip();
+    renderTimeGrid();
+  }
+
+  function renderTimeGrid(){
+    const day = scheduleData.find(d => d.date === selectedDate);
+    timeLabelEl.textContent = day ? day.label + ' 시간 선택' : '시간 선택';
+    timeGridEl.innerHTML = '';
+
+    if(!day || !day.slots.length){
+      timeGridEl.innerHTML = '<div class="empty-msg">신청 가능한 시간이 없어요.</div>';
+      return;
+    }
+
+    day.slots.forEach(slot => {
+      const btn = document.createElement('button');
+      btn.className = 'time-chip' + (slot.available ? '' : ' disabled');
+      btn.textContent = slot.time;
+      if(slot.available){
+        btn.onclick = () => openSheet(slot.time);
+      }else{
+        btn.disabled = true;
+      }
+      timeGridEl.appendChild(btn);
+    });
+  }
+
+  function openSheet(time){
+    selectedTime = time;
+    const day = scheduleData.find(d => d.date === selectedDate);
+    pickedInfoEl.textContent = day.label + ' ' + time;
+    document.getElementById('studentId').value = '';
+    document.getElementById('studentName').value = '';
+    document.getElementById('purpose').value = '';
+    overlayEl.classList.add('open');
+  }
+
+  document.getElementById('cancelBtn').onclick = () => overlayEl.classList.remove('open');
+  overlayEl.onclick = (e) => { if(e.target === overlayEl) overlayEl.classList.remove('open'); };
+
+  document.getElementById('submitBtn').onclick = async () => {
+    const studentId = document.getElementById('studentId').value.trim();
+    const name = document.getElementById('studentName').value.trim();
+    const purpose = document.getElementById('purpose').value.trim();
+
+    if(!studentId || !name || !purpose){
+      showToast('모든 항목을 입력해주세요');
+      return;
+    }
+
+    const submitBtn = document.getElementById('submitBtn');
+    submitBtn.disabled = true;
+    submitBtn.textContent = '신청 중...';
+
+    try{
+      const res = await fetch(APPS_SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // 단순 요청으로 보내 CORS 사전요청을 피함
+        body: JSON.stringify({ studentId, name, date: selectedDate, time: selectedTime, purpose })
+      });
+      const result = await res.json();
+
+      if(result.success){
+        overlayEl.classList.remove('open');
+        showToast('신청이 완료되었어요!');
+        loadSlots();
+      }else{
+        showToast(result.message || '신청에 실패했어요. 다시 시도해주세요.');
+      }
+    }catch(err){
+      showToast('네트워크 오류가 발생했어요.');
+    }finally{
+      submitBtn.disabled = false;
+      submitBtn.textContent = '신청하기';
+    }
+  };
+
+  function showToast(msg){
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    setTimeout(() => toastEl.classList.remove('show'), 2200);
+  }
+
+  loadSlots();
+</script>
+</body>
+</html>
